@@ -221,6 +221,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
 	exynos5420-peach-pit.dtb \
 	exynos5420-smdk5420.dtb \
 	exynos5420-chagallwifi.dtb \
+	exynos5420-klimtwifi.dtb \
 	exynos5422-odroidhc1.dtb \
 	exynos5422-odroidxu3.dtb \
 	exynos5422-odroidxu3-lite.dtb \
