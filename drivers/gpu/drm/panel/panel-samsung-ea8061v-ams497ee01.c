@@ -298,69 +298,14 @@ static const u8 ea8061v_ams497ee01_elvss_tbl[EA8061V_AMS497EE01_NUM_ELVSS_STEPS]
 	0x8a,
 };
 
-static const u8 ea8061v_ams497ee01_elvss_per_gamma[EA8061V_AMS497EE01_NUM_GAMMA_STEPS] = {
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	0 ,
-	1 ,
-	1 ,
-	2 ,
-	2 ,
-	3 ,
-	4 ,
-	4 ,
-	5 ,
-	6 ,
-	7 ,
-	7 ,
-	7 ,
-	8 ,
-	9 ,
-	10,
-	11,
-	11,
-	11,
-	12,
-	13,
-	14,
-	15,
-	16,
-	17,
+/* Which ELVSS sequence to use for which candela level.
+ */
+static const u8 map_candela_to_elvss[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	1, 1, 2, 2, 3, 4, 4, 5, 6,
+	7, 7, 7, 8, 9, 10,
+	11, 11, 11, 12, 13, 14, 15, 16, 17
 };
 
 static const u8 ea8061v_ams497ee01_aid_tbl[EA8061V_AMS497EE01_NUM_AID_STEPS][EA8061V_AMS497EE01_AID_CMD_CNT] = {
@@ -408,69 +353,15 @@ static const u8 ea8061v_ams497ee01_aid_tbl[EA8061V_AMS497EE01_NUM_AID_STEPS][EA8
 	{ 0xb2, 0x00, 0x00, 0x00, 0x0a }, //  0.77 %
 };
 
-static const u8 ea8061v_ams497ee01_aid_per_gamma[EA8061V_AMS497EE01_NUM_GAMMA_STEPS] = {
-	0 ,
-	1 ,
-	2 ,
-	3 ,
-	4 ,
-	5 ,
-	6 ,
-	7 ,
-	8 ,
-	9 ,
-	10,
-	11,
-	12,
-	13,
-	14,
-	15,
-	16,
-	17,
-	18,
-	19,
-	20,
-	21,
-	22,
-	23,
-	24,
-	25,
-	26,
-	27,
-	28,
-	29,
-	30,
-	31,
-	32,
-	33,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	34,
-	35,
-	36,
-	37,
-	38,
-	39,
-	40,
-	41,
-	41,
-	41,
-	41,
-	41,
-	41,
-	41,
+/* Which AID sequence to use for each candela level.
+ */
+static const u8 map_candela_to_aid[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS] = {
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11,
+	12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+	24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 34,
+	34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34,
+	34, 35, 36, 37, 38, 39, 40, 41, 41, 41, 41, 41,
+	41, 41,
 };
 
 struct ea8061v_ams497ee01 {
@@ -594,10 +485,10 @@ static int ea8061v_ams497ee01_update_aid(struct ea8061v_ams497ee01 *ctx, unsigne
 	int ret;
 	u8 aid_cmd[5] = { 0xb2, 0x00, 0x00 };
 
-	pr_err("aid index: %u\n", ea8061v_ams497ee01_aid_per_gamma[index]);
+	pr_err("aid index: %u\n", map_candela_to_aid[index]);
 
 	memcpy(aid_cmd + 3, ea8061v_ams497ee01_aid_tbl +
-	       ea8061v_ams497ee01_aid_per_gamma[index], 2);
+	       map_candela_to_aid[index], 2);
 	ret = mipi_dsi_dcs_write_buffer(ctx->dsi, aid_cmd, ARRAY_SIZE(aid_cmd));
 	if (ret < 0)
 		return ret;
@@ -616,10 +507,10 @@ static int ea8061v_ams497ee01_update_elvss(struct ea8061v_ams497ee01 *ctx, unsig
 		elvss_cmd[1] = 0x5c;
 	}
 
-	pr_err("elvss index: %u\n", ea8061v_ams497ee01_elvss_per_gamma[index]);
+	pr_err("elvss index: %u\n", map_candela_to_elvss[index]);
 
 	memcpy(elvss_cmd + 2, ea8061v_ams497ee01_elvss_tbl +
-	       ea8061v_ams497ee01_elvss_per_gamma[index], 1);
+	       map_candela_to_elvss[index], 1);
 	ret = mipi_dsi_dcs_write_buffer(ctx->dsi, elvss_cmd,
 					ARRAY_SIZE(elvss_cmd));
 	if (ret < 0)
