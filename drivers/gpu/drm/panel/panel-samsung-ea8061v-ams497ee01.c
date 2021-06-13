@@ -609,7 +609,12 @@ static int ea8061v_ams497ee01_update_elvss(struct ea8061v_ams497ee01 *ctx, unsig
 	unsigned int index = ea8061v_ams497ee01_get_brightness_index(brightness);
 	int ret;
 	/* 0x5c for acl off, 0x4c for acl on */
-	u8 elvss_cmd[3] = { 0xb6, 0x5c, };
+	u8 elvss_cmd[3] = { 0xb6, };
+	if (brightness < 70) {
+		elvss_cmd[1] = 0x4c;
+	} else {
+		elvss_cmd[1] = 0x5c;
+	}
 
 	pr_err("elvss index: %u\n", ea8061v_ams497ee01_elvss_per_gamma[index]);
 
@@ -664,7 +669,19 @@ static int ea8061v_ams497ee01_set_brightness(struct backlight_device *bl_dev)
 	/* aid/aor */
 	ea8061v_ams497ee01_update_aid(ctx, brightness);
 
-	/* elvss b6 (acl off) */
+	/* acl opr on */
+	dsi_dcs_write_seq(dsi, 0xb5, 0x29);
+	if (brightness < 70) {
+		/* acl percent (2 : 15 % ACL) */
+		dsi_dcs_write_seq(dsi, 0x55, 0x02);
+		ea8061v_ams497ee01_gamma_update(ctx);
+	} else {
+		/* acl off */
+		dsi_dcs_write_seq(dsi, 0x55, 0x00);
+		ea8061v_ams497ee01_gamma_update(ctx);
+	}
+
+	/* elvss b6 */
 	ea8061v_ams497ee01_update_elvss(ctx, brightness);
 
 	/* gamma ca */
