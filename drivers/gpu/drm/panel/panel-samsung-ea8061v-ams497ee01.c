@@ -14,19 +14,25 @@
 #include <linux/of.h>
 #include <linux/regulator/consumer.h>
 
-#define EA8061V_AMS497EE01_MIN_BRIGHTNESS	0
-#define EA8061V_AMS497EE01_MAX_BRIGHTNESS	100
-#define EA8061V_AMS497EE01_DEFAULT_BRIGHTNESS	80
 
-#define EA8061V_AMS497EE01_NUM_GAMMA_STEPS	62
+#define EA8061V_AMS497EE01_NUM_GAMMA_LEVELS	62
 #define EA8061V_AMS497EE01_GAMMA_CMD_CNT	33
 
-#define EA8061V_AMS497EE01_NUM_AID_STEPS	42
-#define EA8061V_AMS497EE01_AID_CMD_CNT		5
+#define EA8061V_AMS497EE01_MIN_BRIGHTNESS	0
+#define EA8061V_AMS497EE01_MAX_BRIGHTNESS	(EA8061V_AMS497EE01_NUM_GAMMA_LEVELS - 1)
+#define EA8061V_AMS497EE01_DEFAULT_BRIGHTNESS	40
 
-#define EA8061V_AMS497EE01_NUM_ELVSS_STEPS	18
+/* Which ELVSS sequence to use for which candela level.
+ */
+static const u8 map_candela_to_elvss[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS] = {
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	1, 1, 2, 2, 3, 4, 4, 5, 6,
+	7, 7, 7, 8, 9, 10,
+	11, 11, 11, 12, 13, 14, 15, 16, 17
+};
 
-static const u8 gamma_tbl[EA8061V_AMS497EE01_NUM_GAMMA_STEPS][EA8061V_AMS497EE01_GAMMA_CMD_CNT] = {
+static const u8 seq_ea8061v_ams497ee01_lux[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS][EA8061V_AMS497EE01_GAMMA_CMD_CNT] = {
 	{ 0x00, 0x92, 0x00, 0xac, 0x00, 0x7e, 0x8a, 0x8f, 0x8b,
 	  0x8d, 0x91, 0x8d, 0x96, 0xa1, 0x99, 0x9b, 0xa5, 0x00,
 	  0x9c, 0x95, 0xa1, 0x8d, 0x9d, 0xa3, 0xa1, 0xba, 0xbb,
@@ -274,10 +280,12 @@ static const u8 gamma_tbl[EA8061V_AMS497EE01_NUM_GAMMA_STEPS][EA8061V_AMS497EE01
 	{ 0x01, 0x00, 0x01, 0x00, 0x01, 0x00, 0x80, 0x80, 0x80,
 	  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
 	  0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
-	  0x80, 0x80, 0x80, 0x00, 0x00, 0x00 },
+	  0x80, 0x80, 0x80, 0x00, 0x00, 0x00 }
 };
 
-static const u8 ea8061v_ams497ee01_elvss_tbl[EA8061V_AMS497EE01_NUM_ELVSS_STEPS] = {
+/* ELVSS (Amoled negative power supply) tables */
+#define EA8061V_AMS497EE01_NUM_ELVSS_SEQUENCES	18
+static const u8 ea8061v_ams497ee01_elvss_tbl[EA8061V_AMS497EE01_NUM_ELVSS_SEQUENCES] = {
 	0x9b,
 	0x9a,
 	0x99,
@@ -295,64 +303,11 @@ static const u8 ea8061v_ams497ee01_elvss_tbl[EA8061V_AMS497EE01_NUM_ELVSS_STEPS]
 	0x8d,
 	0x8c,
 	0x8b,
-	0x8a,
+	0x8a
 };
 
-/* Which ELVSS sequence to use for which candela level.
- */
-static const u8 map_candela_to_elvss[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS] = {
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	1, 1, 2, 2, 3, 4, 4, 5, 6,
-	7, 7, 7, 8, 9, 10,
-	11, 11, 11, 12, 13, 14, 15, 16, 17
-};
-
-static const u8 ea8061v_ams497ee01_aid_tbl[EA8061V_AMS497EE01_NUM_AID_STEPS][EA8061V_AMS497EE01_AID_CMD_CNT] = {
-	{ 0xb2, 0x00, 0x00, 0x04, 0xdf }, // 95.63 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0xd3 }, // 94.71 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0xc7 }, // 93.79 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0xbb }, // 92.87 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0xb0 }, // 92.02 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0xa4 }, // 91.10 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x99 }, // 90.26 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x8d }, // 89.34 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x82 }, // 88.50 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x76 }, // 87.58 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x6a }, // 86.66 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x5f }, // 85.81 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x52 }, // 84.82 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x3b }, // 83.05 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x31 }, // 82.29 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x25 }, // 81.37 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x18 }, // 80.37 %
-	{ 0xb2, 0x00, 0x00, 0x04, 0x01 }, // 78.60 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0xf5 }, // 77.68 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0xdb }, // 75.69 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0xc5 }, // 74.00 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0xb7 }, // 72.93 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0x9e }, // 71.01 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0x88 }, // 69.33 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0x64 }, // 66.56 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0x4b }, // 64.64 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0x32 }, // 62.73 %
-	{ 0xb2, 0x00, 0x00, 0x03, 0x0d }, // 59.89 %
-	{ 0xb2, 0x00, 0x00, 0x02, 0xe7 }, // 56.98 %
-	{ 0xb2, 0x00, 0x00, 0x02, 0xc2 }, // 54.14 %
-	{ 0xb2, 0x00, 0x00, 0x02, 0x9d }, // 51.30 %
-	{ 0xb2, 0x00, 0x00, 0x02, 0x79 }, // 48.54 %
-	{ 0xb2, 0x00, 0x00, 0x02, 0x45 }, // 44.56 %
-	{ 0xb2, 0x00, 0x00, 0x02, 0x13 }, // 40.72 %
-	{ 0xb2, 0x00, 0x00, 0x01, 0xe7 }, // 37.35 %
-	{ 0xb2, 0x00, 0x00, 0x01, 0xae }, // 32.98 %
-	{ 0xb2, 0x00, 0x00, 0x01, 0x76 }, // 28.68 %
-	{ 0xb2, 0x00, 0x00, 0x01, 0x39 }, // 24.00 %
-	{ 0xb2, 0x00, 0x00, 0x00, 0xf8 }, // 19.02 %
-	{ 0xb2, 0x00, 0x00, 0x00, 0xb4 }, // 13.80 %
-	{ 0xb2, 0x00, 0x00, 0x00, 0x63 }, //  7.59 %
-	{ 0xb2, 0x00, 0x00, 0x00, 0x0a }, //  0.77 %
-};
-
+#define EA8061V_AMS497EE01_NUM_AID_LEVELS	42
+#define EA8061V_AMS497EE01_AID_CMD_CNT		4
 /* Which AID sequence to use for each candela level.
  */
 static const u8 map_candela_to_aid[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS] = {
@@ -361,7 +316,52 @@ static const u8 map_candela_to_aid[EA8061V_AMS497EE01_NUM_GAMMA_LEVELS] = {
 	24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 34,
 	34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34,
 	34, 35, 36, 37, 38, 39, 40, 41, 41, 41, 41, 41,
-	41, 41,
+	41, 41
+};
+
+static const u8 seq_ea8061v_ams497ee01_aid[EA8061V_AMS497EE01_NUM_AID_LEVELS][EA8061V_AMS497EE01_AID_CMD_CNT] = {
+	{ 0x00, 0x00, 0x04, 0xdf }, /* 95.63 % */
+	{ 0x00, 0x00, 0x04, 0xd3 }, /* 94.71 % */
+	{ 0x00, 0x00, 0x04, 0xc7 }, /* 93.79 % */
+	{ 0x00, 0x00, 0x04, 0xbb }, /* 92.87 % */
+	{ 0x00, 0x00, 0x04, 0xb0 }, /* 92.02 % */
+	{ 0x00, 0x00, 0x04, 0xa4 }, /* 91.10 % */
+	{ 0x00, 0x00, 0x04, 0x99 }, /* 90.26 % */
+	{ 0x00, 0x00, 0x04, 0x8d }, /* 89.34 % */
+	{ 0x00, 0x00, 0x04, 0x82 }, /* 88.50 % */
+	{ 0x00, 0x00, 0x04, 0x76 }, /* 87.58 % */
+	{ 0x00, 0x00, 0x04, 0x6a }, /* 86.66 % */
+	{ 0x00, 0x00, 0x04, 0x5f }, /* 85.81 % */
+	{ 0x00, 0x00, 0x04, 0x52 }, /* 84.82 % */
+	{ 0x00, 0x00, 0x04, 0x3b }, /* 83.05 % */
+	{ 0x00, 0x00, 0x04, 0x31 }, /* 82.29 % */
+	{ 0x00, 0x00, 0x04, 0x25 }, /* 81.37 % */
+	{ 0x00, 0x00, 0x04, 0x18 }, /* 80.37 % */
+	{ 0x00, 0x00, 0x04, 0x01 }, /* 78.60 % */
+	{ 0x00, 0x00, 0x03, 0xf5 }, /* 77.68 % */
+	{ 0x00, 0x00, 0x03, 0xdb }, /* 75.69 % */
+	{ 0x00, 0x00, 0x03, 0xc5 }, /* 74.00 % */
+	{ 0x00, 0x00, 0x03, 0xb7 }, /* 72.93 % */
+	{ 0x00, 0x00, 0x03, 0x9e }, /* 71.01 % */
+	{ 0x00, 0x00, 0x03, 0x88 }, /* 69.33 % */
+	{ 0x00, 0x00, 0x03, 0x64 }, /* 66.56 % */
+	{ 0x00, 0x00, 0x03, 0x4b }, /* 64.64 % */
+	{ 0x00, 0x00, 0x03, 0x32 }, /* 62.73 % */
+	{ 0x00, 0x00, 0x03, 0x0d }, /* 59.89 % */
+	{ 0x00, 0x00, 0x02, 0xe7 }, /* 56.98 % */
+	{ 0x00, 0x00, 0x02, 0xc2 }, /* 54.14 % */
+	{ 0x00, 0x00, 0x02, 0x9d }, /* 51.30 % */
+	{ 0x00, 0x00, 0x02, 0x79 }, /* 48.54 % */
+	{ 0x00, 0x00, 0x02, 0x45 }, /* 44.56 % */
+	{ 0x00, 0x00, 0x02, 0x13 }, /* 40.72 % */
+	{ 0x00, 0x00, 0x01, 0xe7 }, /* 37.35 % */
+	{ 0x00, 0x00, 0x01, 0xae }, /* 32.98 % */
+	{ 0x00, 0x00, 0x01, 0x76 }, /* 28.68 % */
+	{ 0x00, 0x00, 0x01, 0x39 }, /* 24.00 % */
+	{ 0x00, 0x00, 0x00, 0xf8 }, /* 19.02 % */
+	{ 0x00, 0x00, 0x00, 0xb4 }, /* 13.80 % */
+	{ 0x00, 0x00, 0x00, 0x63 }, /*  7.59 % */
+	{ 0x00, 0x00, 0x00, 0x0a }  /*  0.77 % */
 };
 
 struct ea8061v_ams497ee01 {
@@ -467,11 +467,6 @@ static int ea8061v_ams497ee01_get_brightness(struct backlight_device *bl_dev)
 	return bl_dev->props.brightness;
 }
 
-static unsigned int ea8061v_ams497ee01_get_brightness_index(unsigned int brightness)
-{
-	return (brightness * (EA8061V_AMS497EE01_NUM_GAMMA_STEPS - 1)) /
-		EA8061V_AMS497EE01_MAX_BRIGHTNESS;
-}
 
 static int ea8061v_ams497ee01_gamma_update(struct ea8061v_ams497ee01 *ctx)
 {
@@ -481,14 +476,15 @@ static int ea8061v_ams497ee01_gamma_update(struct ea8061v_ams497ee01 *ctx)
 
 static int ea8061v_ams497ee01_update_aid(struct ea8061v_ams497ee01 *ctx, unsigned int brightness)
 {
-	unsigned int index = ea8061v_ams497ee01_get_brightness_index(brightness);
 	int ret;
-	u8 aid_cmd[5] = { 0xb2, 0x00, 0x00 };
+	u8 aid_cmd[5] = { 0xb2, };
 
-	pr_err("aid index: %u\n", map_candela_to_aid[index]);
+	pr_debug("ea8061v_ams497ee01 aid index: %u\n",
+		 map_candela_to_aid[brightness]);
 
-	memcpy(aid_cmd + 3, ea8061v_ams497ee01_aid_tbl +
-	       map_candela_to_aid[index], 2);
+	memcpy(aid_cmd + 1, seq_ea8061v_ams497ee01_aid +
+	       map_candela_to_aid[brightness], 4);
+
 	ret = mipi_dsi_dcs_write_buffer(ctx->dsi, aid_cmd, ARRAY_SIZE(aid_cmd));
 	if (ret < 0)
 		return ret;
@@ -497,20 +493,16 @@ static int ea8061v_ams497ee01_update_aid(struct ea8061v_ams497ee01 *ctx, unsigne
 
 static int ea8061v_ams497ee01_update_elvss(struct ea8061v_ams497ee01 *ctx, unsigned int brightness)
 {
-	unsigned int index = ea8061v_ams497ee01_get_brightness_index(brightness);
 	int ret;
 	/* 0x5c for acl off, 0x4c for acl on */
-	u8 elvss_cmd[3] = { 0xb6, };
-	if (brightness < 70) {
-		elvss_cmd[1] = 0x4c;
-	} else {
-		elvss_cmd[1] = 0x5c;
-	}
+	u8 elvss_cmd[3] = { 0xb6, 0x5c };
 
-	pr_err("elvss index: %u\n", map_candela_to_elvss[index]);
+	pr_debug("ea8061v_ams497ee01 elvss index: %u\n",
+		 map_candela_to_elvss[brightness]);
 
 	memcpy(elvss_cmd + 2, ea8061v_ams497ee01_elvss_tbl +
-	       map_candela_to_elvss[index], 1);
+	       map_candela_to_elvss[brightness], 1);
+
 	ret = mipi_dsi_dcs_write_buffer(ctx->dsi, elvss_cmd,
 					ARRAY_SIZE(elvss_cmd));
 	if (ret < 0)
@@ -521,13 +513,13 @@ static int ea8061v_ams497ee01_update_elvss(struct ea8061v_ams497ee01 *ctx, unsig
 static int ea8061v_ams497ee01_update_gamma(struct ea8061v_ams497ee01 *ctx, unsigned int brightness)
 {
 	struct backlight_device *bl_dev = ctx->bl_dev;
-	unsigned int index = ea8061v_ams497ee01_get_brightness_index(brightness);
 	u8 data[EA8061V_AMS497EE01_GAMMA_CMD_CNT + 1] = { 0xca, };
 	int ret;
 
-	pr_err("index: %u\n", index);
+	pr_debug("ea8061v_ams497ee01 brightness: %u\n", brightness);
 
-	memcpy(data + 1, gamma_tbl + index, EA8061V_AMS497EE01_GAMMA_CMD_CNT);
+	memcpy(data + 1, seq_ea8061v_ams497ee01_lux + brightness,
+	       EA8061V_AMS497EE01_GAMMA_CMD_CNT);
 
 	ret = mipi_dsi_dcs_write_buffer(ctx->dsi, data, ARRAY_SIZE(data));
 	if (ret < 0)
@@ -562,18 +554,14 @@ static int ea8061v_ams497ee01_set_brightness(struct backlight_device *bl_dev)
 
 	/* acl opr on */
 	dsi_dcs_write_seq(dsi, 0xb5, 0x29);
-	if (brightness < 70) {
-		/* acl percent (2 : 15 % ACL) */
-		dsi_dcs_write_seq(dsi, 0x55, 0x02);
-		ea8061v_ams497ee01_gamma_update(ctx);
-	} else {
-		/* acl off */
-		dsi_dcs_write_seq(dsi, 0x55, 0x00);
-		ea8061v_ams497ee01_gamma_update(ctx);
-	}
+	/* acl off (0x55, 0x02 for 15 % ACL) */
+	dsi_dcs_write_seq(dsi, 0x55, 0x00);
+	ea8061v_ams497ee01_gamma_update(ctx);
 
 	/* elvss b6 */
 	ea8061v_ams497ee01_update_elvss(ctx, brightness);
+
+	/* Temperature corrections would go here */
 
 	/* gamma ca */
 	ea8061v_ams497ee01_update_gamma(ctx, brightness);
