@@ -142,6 +142,7 @@ properties:
               - insignal,arndale-octa           # Insignal Arndale Octa
               - samsung,chagall-wifi            # Samsung SM-T800
               - samsung,klimt-wifi              # Samsung SM-T700
+              - samsung,klimt-lte               # Samsung SM-T705
               - samsung,smdk5420                # Samsung SMDK5420 eval
           - const: samsung,exynos5420
           - const: samsung,exynos5
