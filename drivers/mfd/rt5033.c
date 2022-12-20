@@ -17,6 +17,8 @@
 #include <linux/mfd/rt5033.h>
 #include <linux/mfd/rt5033-private.h>
 
+#include <linux/gpio/consumer.h>
+
 static const struct regmap_irq rt5033_irqs[] = {
 	{ .mask = RT5033_PMIC_IRQ_BUCKOCP, },
 	{ .mask = RT5033_PMIC_IRQ_BUCKLV, },
@@ -73,7 +75,18 @@ static int rt5033_i2c_probe(struct i2c_client *i2c)
 		return PTR_ERR(rt5033->regmap);
 	}
 
+	rt5033->reset_gpio = devm_gpiod_get_optional(&i2c->dev, "reset", GPIOD_OUT_HIGH);
+	ret = IS_ERR(rt5033->reset_gpio);
+	if (ret)
+		return dev_err_probe(&i2c->dev, PTR_ERR(rt5033->reset_gpio), "Cannot get reset GPIO: %d\n", ret);
+
+	if (rt5033->reset_gpio) {
+		gpiod_set_value_cansleep(rt5033->reset_gpio, 1);
+		msleep(20);
+	}
+
 	ret = regmap_read(rt5033->regmap, RT5033_REG_DEVICE_ID, &dev_id);
+
 	if (ret) {
 		dev_err(&i2c->dev, "Device not found\n");
 		return -ENODEV;

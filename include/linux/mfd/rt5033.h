@@ -29,6 +29,8 @@ struct rt5033_dev {
 	struct regmap_irq_chip_data *irq_data;
 	int irq;
 	bool wakeup;
+
+	struct gpio_desc *reset_gpio;
 };
 
 #endif /* __RT5033_H__ */
