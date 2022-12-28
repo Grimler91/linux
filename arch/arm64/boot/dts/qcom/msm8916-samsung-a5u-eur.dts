@@ -100,6 +100,10 @@
 	remote-endpoint = <&panel_in>;
 };
 
+&flash_led {
+	led-max-microamp = <63000>;
+};
+
 &touchkey {
 	vcc-supply = <&reg_touch_key>;
 	vdd-supply = <&reg_touch_key>;

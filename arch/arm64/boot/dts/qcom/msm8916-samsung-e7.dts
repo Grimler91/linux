@@ -81,6 +81,11 @@
 	};
 };
 
+&flash_led {
+	led-max-microamp = <75000>;
+	flash-max-microamp = <550000>;
+};
+
 &panel {
 	compatible = "samsung,e7-panel";
 

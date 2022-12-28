@@ -108,6 +108,10 @@
 	remote-endpoint = <&panel_in>;
 };
 
+&flash_led {
+	led-max-microamp = <38000>;
+};
+
 &vibrator {
 	status = "okay";
 };
