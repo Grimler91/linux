@@ -36,6 +36,15 @@
 		};
 	};
 
+	battery: battery {
+		compatible = "simple-battery";
+		precharge-current-microamp = <450000>;
+		constant-charge-current-max-microamp = <1000000>;
+		charge-term-current-microamp = <150000>;
+		precharge-upper-limit-microvolt = <3500000>;
+		constant-charge-voltage-max-microvolt = <4350000>;
+	};
+
 	clk_pwm: pwm {
 		compatible = "clk-pwm";
 		#pwm-cells = <2>;
@@ -136,6 +145,12 @@
 
 			pinctrl-names = "default";
 			pinctrl-0 = <&muic_int_default>;
+
+			usb_con: connector {
+				compatible = "usb-b-connector";
+				label = "micro-USB";
+				type = "micro";
+			};
 		};
 	};
 
@@ -247,7 +262,7 @@
 &blsp_i2c4 {
 	status = "okay";
 
-	battery@35 {
+	fuel-gauge@35 {
 		compatible = "richtek,rt5033-battery";
 		reg = <0x35>;
 		interrupt-parent = <&msmgpio>;
@@ -255,6 +270,48 @@
 
 		pinctrl-names = "default";
 		pinctrl-0 = <&fg_alert_default>;
+
+		power-supplies = <&rt5033_charger>;
+	};
+};
+
+&blsp_i2c6 {
+	status = "okay";
+
+	pmic@34 {
+		compatible = "richtek,rt5033";
+		reg = <0x34>;
+
+		interrupt-parent = <&msmgpio>;
+		interrupts = <62 IRQ_TYPE_EDGE_FALLING>;
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&mfd_int_default>;
+
+		regulators {
+			safe_ldo_reg: SAFE_LDO {
+				regulator-name = "SAFE_LDO";
+				regulator-min-microvolt = <4900000>;
+				regulator-max-microvolt = <4900000>;
+				regulator-always-on;
+			};
+			ldo_reg: LDO {
+				regulator-name = "LDO";
+				regulator-min-microvolt = <2800000>;
+				regulator-max-microvolt = <2800000>;
+			};
+			buck_reg: BUCK {
+				regulator-name = "BUCK";
+				regulator-min-microvolt = <1200000>;
+				regulator-max-microvolt = <1200000>;
+			};
+		};
+
+		rt5033_charger: charger {
+			compatible = "richtek,rt5033-charger";
+			monitored-battery = <&battery>;
+			richtek,usb-connector = <&usb_con>;
+		};
 	};
 };
 
@@ -509,6 +566,22 @@
 		bias-pull-down;
 	};
 
+	mfd_i2c_default: mfd-i2c-default-state {
+		pins = "gpio22", "gpio23";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	mfd_int_default: mfd-int-default-state {
+		pins = "gpio62";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-disable;
+	};
+
 	motor_en_default: motor-en-default-state {
 		pins = "gpio76";
 		function = "gpio";
@@ -558,6 +631,14 @@
 
 	nfc_i2c_default: nfc-i2c-default-state {
 		pins = "gpio0", "gpio1";
+		function = "gpio";
+
+		drive-strength = <2>;
+		bias-disable;
+	};
+
+	fg_i2c_default: fg-i2c-default-state {
+		pins = "gpio14", "gpio15";
 		function = "gpio";
 
 		drive-strength = <2>;
