@@ -312,6 +312,18 @@
 			monitored-battery = <&battery>;
 			richtek,usb-connector = <&usb_con>;
 		};
+
+		led {
+			compatible = "richtek,rt5033-led";
+
+			flash-led {
+				label = "rt5033-flash";
+				led-sources = <0>, <1>;
+				led-max-microamp = <200000>;
+				flash-max-microamp = <800000>;
+				flash-max-timeout-us = <1216000>;
+			};
+		};
 	};
 };
 
