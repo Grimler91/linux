@@ -147,7 +147,7 @@ static int rt5033_set_flash_current(struct rt5033_led *led, u32 micro_amp)
 	return 0;
 }
 
-static int rt5033_set_timeout(struct rt5033_led *led, u32 microsec)
+static int rt5033_set_flash_timeout(struct rt5033_led *led, u32 microsec)
 {
 	u8 v;
 	int ret;
@@ -206,11 +206,8 @@ static int rt5033_led_flash_brightness_set(struct led_classdev_flash *fled_cdev,
 					   u32 brightness)
 {
 	struct rt5033_sub_led *sub_led = flcdev_to_sub_led(fled_cdev);
-	struct rt5033_led *led = sub_led_to_led(sub_led);
 
-	mutex_lock(&led->lock);
 	sub_led->flash_brightness = brightness;
-	mutex_unlock(&led->lock);
 
 	return 0;
 }
@@ -219,11 +216,8 @@ static int rt5033_led_flash_timeout_set(struct led_classdev_flash *fled_cdev,
 					u32 timeout)
 {
 	struct rt5033_sub_led *sub_led = flcdev_to_sub_led(fled_cdev);
-	struct rt5033_led *led = sub_led_to_led(sub_led);
 
-	mutex_lock(&led->lock);
 	sub_led->flash_timeout = timeout;
-	mutex_unlock(&led->lock);
 
 	return 0;
 }
@@ -259,7 +253,7 @@ static int rt5033_led_flash_strobe_set(struct led_classdev_flash *fled_cdev,
 	}
 
 	if (sub_led->flash_timeout != led->current_flash_timeout) {
-		ret = rt5033_set_timeout(led, sub_led->flash_timeout);
+		ret = rt5033_set_flash_timeout(led, sub_led->flash_timeout);
 		if (ret < 0)
 			goto strobe_unlock;
 	}
