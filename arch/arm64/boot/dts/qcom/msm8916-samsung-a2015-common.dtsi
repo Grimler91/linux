@@ -302,21 +302,24 @@
 		interrupt-parent = <&msmgpio>;
 		interrupts = <62 IRQ_TYPE_EDGE_FALLING>;
 
-		pinctrl-names = "default";
+		reset-gpios = <&msmgpio 102 GPIO_ACTIVE_LOW>;
+
 		pinctrl-0 = <&mfd_int_default>;
+		pinctrl-names = "default";
 
 		regulators {
 			safe_ldo_reg: SAFE_LDO {
 				regulator-name = "SAFE_LDO";
 				regulator-min-microvolt = <4900000>;
 				regulator-max-microvolt = <4900000>;
-				regulator-always-on;
 			};
+
 			ldo_reg: LDO {
 				regulator-name = "LDO";
 				regulator-min-microvolt = <2800000>;
 				regulator-max-microvolt = <2800000>;
 			};
+
 			buck_reg: BUCK {
 				regulator-name = "BUCK";
 				regulator-min-microvolt = <1200000>;
@@ -406,8 +409,9 @@
 };
 
 &usb {
-	status = "okay";
+	vbus-supply = <&safe_ldo_reg>;
 	extcon = <&muic>, <&muic>;
+	status = "okay";
 };
 
 &usb_hs_phy {
@@ -599,11 +603,19 @@
 	};
 
 	mfd_int_default: mfd-int-default-state {
-		pins = "gpio62";
-		function = "gpio";
+		int-pins {
+			pins = "gpio62";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
 
-		drive-strength = <2>;
-		bias-disable;
+		mrstb-pins {
+			pins = "gpio102";
+			function = "gpio";
+			drive-strength = <2>;
+			bias-disable;
+		};
 	};
 
 	motor_en_default: motor-en-default-state {
