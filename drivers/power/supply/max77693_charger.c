@@ -737,11 +737,41 @@ static int max77693_set_charging(struct max77693_charger *chg, bool enable)
 	return ret;
 }
 
+static int max77693_set_otg(struct max77693_charger *chg, bool enable)
+{
+	struct regmap *regmap = chg->max77693->regmap;
+	unsigned int data;
+	bool is_enabled;
+	int ret;
+
+	ret = regmap_read(regmap, MAX77693_CHG_REG_CHG_CNFG_00, &data);
+	if (ret)
+		return ret;
+
+	is_enabled = !!(data & CHG_CNFG_00_OTG_MASK);
+
+	if (enable && !is_enabled) {
+		/* OTG on, boost on, DIS_MUIC_CTRL on */
+		data |= CHG_CNFG_00_OTG_MASK | CHG_CNFG_00_BOOST_MASK \
+				| CHG_CNFG_00_DIS_MUIC_CTRL_MASK;
+
+	} else if (!enable && is_enabled) {
+		/* OTG off, boost off, DIS_MUIC_CTRL off */
+		data &= ~(CHG_CNFG_00_OTG_MASK | CHG_CNFG_00_BOOST_MASK \
+				| CHG_CNFG_00_DIS_MUIC_CTRL_MASK);
+	}
+
+	return regmap_write(chg->max77693->regmap,
+			MAX77693_CHG_REG_CHG_CNFG_00,
+			data);
+}
+
 static void max77693_charger_extcon_work(struct work_struct *work)
 {
 	struct max77693_charger *chg = container_of(work, struct max77693_charger,
 						  cable.work);
 	struct extcon_dev *edev = chg->cable.edev;
+	bool set_charging, set_otg;
 	int connector, state;
 	int ret;
 
@@ -760,25 +790,43 @@ static void max77693_charger_extcon_work(struct work_struct *work)
 	case EXTCON_CHG_USB_FAST:
 	case EXTCON_CHG_USB_SLOW:
 	case EXTCON_CHG_USB_PD:
-		ret = max77693_set_charging(chg, true);
-		if (ret) {
-			dev_err(chg->dev, "failed to enable charging\n");
-			break;
-		}
+		set_charging = true;
+		set_otg = false;
+
 		dev_info(chg->dev, "charging. connector type: %d\n",
 			 connector);
 		break;
+	case EXTCON_USB_HOST:
+		set_charging = false;
+		set_otg = true;
+
+		dev_info(chg->dev, "USB host. connector type: %d\n",
+			 connector);
+		break;
 	default:
-		ret = max77693_set_charging(chg, false);
-		if (ret) {
-			dev_err(chg->dev, "failed to disable charging\n");
-			break;
-		}
-		dev_info(chg->dev, "charging. connector type: %d\n",
+		set_charging = false;
+		set_otg = false;
+
+		dev_info(chg->dev, "disconnected. connector type: %d\n",
 			 connector);
 		break;
 	}
 
+	/*
+	 * The functions below already check if the change is necessary,
+	 * so we don't need to do so here.
+	 */
+	ret = max77693_set_charging(chg, set_charging);
+	if (ret) {
+		dev_err(chg->dev, "failed to set charging (%d)\n", ret);
+		goto out;
+	}
+
+	ret = max77693_set_otg(chg, set_otg);
+	if (ret)
+		dev_err(chg->dev, "failed to set OTG (%d)\n", ret);
+
+out:
 	power_supply_changed(chg->charger);
 }
 
