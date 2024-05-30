@@ -28,6 +28,7 @@ struct max77693_charger {
 	u32 min_system_volt;
 	u32 thermal_regulation_temp;
 	u32 batttery_overcurrent;
+	u32 fast_charge_current;
 	u32 charge_input_threshold_volt;
 };
 
@@ -591,6 +592,35 @@ static int max77693_set_batttery_overcurrent(struct max77693_charger *chg,
 			CHG_CNFG_12_B2SOVRC_MASK, data);
 }
 
+static int max77693_set_input_current_limit(struct max77693_charger *chg,
+		unsigned int uamp)
+{
+	dev_dbg(chg->dev, "CHGIN input current limit: %u\n", uamp);
+
+	return regulator_set_current_limit(chg->regu, (int)uamp, (int)uamp);
+}
+
+static int max77693_set_fast_charge_current(struct max77693_charger *chg,
+		unsigned int uamp)
+{
+	unsigned int data;
+
+	data = (uamp / 1000) * 10 / 333; /* 0.1A/3 steps */
+
+	if (data > CHG_CNFG_02_CC_MASK) {
+		dev_err(chg->dev, "Wrong value for fast charge current\n");
+		return -EINVAL;
+	}
+
+	data <<= CHG_CNFG_02_CC_SHIFT;
+
+	dev_dbg(chg->dev, "Fast charge current: %u (0x%x)\n", uamp, data);
+
+	return regmap_update_bits(chg->max77693->regmap,
+			MAX77693_CHG_REG_CHG_CNFG_02,
+			CHG_CNFG_02_CC_MASK, data);
+}
+
 static int max77693_set_charge_input_threshold_volt(struct max77693_charger *chg,
 		unsigned int uvolt)
 {
@@ -668,6 +698,15 @@ static int max77693_reg_init(struct max77693_charger *chg)
 	if (ret)
 		return ret;
 
+	ret = max77693_set_fast_charge_current(chg, chg->fast_charge_current);
+	if (ret)
+		return ret;
+
+	ret = max77693_set_input_current_limit(chg,
+				DEFAULT_FAST_CHARGE_CURRENT);
+	if (ret)
+		return ret;
+
 	return max77693_set_charge_input_threshold_volt(chg,
 			chg->charge_input_threshold_volt);
 }
@@ -703,11 +742,17 @@ static int max77693_dt_init(struct device *dev, struct max77693_charger *chg)
 		chg->charge_input_threshold_volt =
 			DEFAULT_CHARGER_INPUT_THRESHOLD_VOLT;
 
+	if (of_property_read_u32(np, "maxim,fast-charge-current-microamp",
+			&chg->fast_charge_current))
+		chg->fast_charge_current = DEFAULT_FAST_CHARGE_CURRENT;
+
 	return 0;
 }
 #else /* CONFIG_OF */
 static int max77693_dt_init(struct device *dev, struct max77693_charger *chg)
 {
+	chg->fast_charge_current = DEFAULT_FAST_CHARGE_CURRENT;
+
 	return 0;
 }
 #endif /* CONFIG_OF */
