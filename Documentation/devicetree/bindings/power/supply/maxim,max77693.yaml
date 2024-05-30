@@ -56,6 +56,13 @@ properties:
     maximum: 3500000
     default: 3500000
 
+  maxim,fast-charge-current-microamp:
+    description:
+      Current to use for fast charge in uA.
+    minimum: 60000
+    maximum: 2580000
+    default: 500000
+
   maxim,charge-input-threshold-microvolt:
     description: |
       Threshold voltage in uV for triggering input voltage regulation loop.
