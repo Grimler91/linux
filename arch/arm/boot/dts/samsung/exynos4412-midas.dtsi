@@ -240,6 +240,7 @@
 				compatible = "maxim,max77693-charger";
 
 				maxim,constant-microvolt = <4350000>;
+				maxim,fast-charge-current-microamp = <1800000>;
 				maxim,min-system-microvolt = <3600000>;
 				maxim,thermal-regulation-celsius = <100>;
 				maxim,battery-overcurrent-microamp = <3500000>;
