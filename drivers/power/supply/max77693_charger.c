@@ -5,6 +5,8 @@
 // Copyright (C) 2014 Samsung Electronics
 // Krzysztof Kozlowski <krzk@kernel.org>
 
+#include <linux/devm-helpers.h>
+#include <linux/extcon.h>
 #include <linux/module.h>
 #include <linux/platform_device.h>
 #include <linux/power_supply.h>
@@ -30,6 +32,13 @@ struct max77693_charger {
 	u32 batttery_overcurrent;
 	u32 fast_charge_current;
 	u32 charge_input_threshold_volt;
+
+	/* USB cable notifications */
+	struct {
+		struct extcon_dev *edev;
+		struct notifier_block nb;
+		struct work_struct work;
+	} cable;
 };
 
 static int max77693_get_charger_state(struct regmap *regmap, int *val)
@@ -711,14 +720,107 @@ static int max77693_reg_init(struct max77693_charger *chg)
 			chg->charge_input_threshold_volt);
 }
 
+static int max77693_set_charging(struct max77693_charger *chg, bool enable)
+{
+	int is_enabled;
+	int ret = 0;
+
+	is_enabled = regulator_is_enabled(chg->regu);
+	if (is_enabled < 0)
+		return is_enabled;
+
+	if (enable && !is_enabled)
+		ret = regulator_enable(chg->regu);
+	else if (!enable && is_enabled)
+		ret = regulator_disable(chg->regu);
+
+	return ret;
+}
+
+static void max77693_charger_extcon_work(struct work_struct *work)
+{
+	struct max77693_charger *chg = container_of(work, struct max77693_charger,
+						  cable.work);
+	struct extcon_dev *edev = chg->cable.edev;
+	int connector, state;
+	int ret;
+
+	for (connector = EXTCON_USB_HOST; connector <= EXTCON_CHG_USB_PD;
+	     connector++) {
+		state = extcon_get_state(edev, connector);
+		if (state == 1)
+			break;
+	}
+
+	switch (connector) {
+	case EXTCON_CHG_USB_SDP:
+	case EXTCON_CHG_USB_DCP:
+	case EXTCON_CHG_USB_CDP:
+	case EXTCON_CHG_USB_ACA:
+	case EXTCON_CHG_USB_FAST:
+	case EXTCON_CHG_USB_SLOW:
+	case EXTCON_CHG_USB_PD:
+		ret = max77693_set_charging(chg, true);
+		if (ret) {
+			dev_err(chg->dev, "failed to enable charging\n");
+			break;
+		}
+		dev_info(chg->dev, "charging. connector type: %d\n",
+			 connector);
+		break;
+	default:
+		ret = max77693_set_charging(chg, false);
+		if (ret) {
+			dev_err(chg->dev, "failed to disable charging\n");
+			break;
+		}
+		dev_info(chg->dev, "charging. connector type: %d\n",
+			 connector);
+		break;
+	}
+
+	power_supply_changed(chg->charger);
+}
+
+static int max77693_charger_extcon_notifier(struct notifier_block *nb,
+					  unsigned long event, void *param)
+{
+	struct max77693_charger *chg = container_of(nb, struct max77693_charger,
+						    cable.nb);
+
+	schedule_work(&chg->cable.work);
+
+	return NOTIFY_OK;
+}
+
 #ifdef CONFIG_OF
 static int max77693_dt_init(struct device *dev, struct max77693_charger *chg)
 {
 	struct device_node *np = dev->of_node;
+	struct device_node *np_conn, *np_edev;
 
 	if (!np) {
 		dev_err(dev, "no charger OF node\n");
 		return -EINVAL;
+	}
+
+	np_conn = of_parse_phandle(np, "maxim,usb-connector", 0);
+	np_edev = of_get_parent(np_conn);
+
+	chg->cable.edev = extcon_find_edev_by_node(np_edev);
+	if (IS_ERR(chg->cable.edev)) {
+		/*
+		 * In case of deferred extcon probe, defer our probe as well
+		 * until it appears.
+		 */
+		if (PTR_ERR(chg->cable.edev) == -EPROBE_DEFER)
+			return PTR_ERR(chg->cable.edev);
+		/*
+		 * Otherwise, ignore errors (the charger can run without a
+		 * connector provided).
+		 */
+		dev_warn(dev, "no extcon device found in device-tree (%ld)\n",
+			 PTR_ERR(chg->cable.edev));
 	}
 
 	if (of_property_read_u32(np, "maxim,constant-microvolt",
@@ -787,6 +889,26 @@ static int max77693_charger_probe(struct platform_device *pdev)
 
 	psy_cfg.drv_data = chg;
 
+	/* Set up extcon if the USB connector node was found */
+	if (!IS_ERR(chg->cable.edev)) {
+		ret = devm_work_autocancel(&pdev->dev, &chg->cable.work,
+					   max77693_charger_extcon_work);
+		if (ret) {
+			dev_err(&pdev->dev, "failed: initialize extcon work\n");
+			return ret;
+		}
+
+		chg->cable.nb.notifier_call = max77693_charger_extcon_notifier;
+
+		ret = devm_extcon_register_notifier_all(&pdev->dev,
+							chg->cable.edev,
+							&chg->cable.nb);
+		if (ret) {
+			dev_err(&pdev->dev, "failed: register extcon notifier\n");
+			return ret;
+		}
+	}
+
 	ret = device_create_file(&pdev->dev, &dev_attr_fast_charge_timer);
 	if (ret) {
 		dev_err(&pdev->dev, "failed: create fast charge timer sysfs entry\n");
@@ -821,6 +943,9 @@ err:
 	device_remove_file(&pdev->dev, &dev_attr_top_off_timer);
 	device_remove_file(&pdev->dev, &dev_attr_top_off_threshold_current);
 	device_remove_file(&pdev->dev, &dev_attr_fast_charge_timer);
+
+	devm_extcon_unregister_notifier_all(&pdev->dev, chg->cable.edev,
+					    &chg->cable.nb);
 
 	return ret;
 }
